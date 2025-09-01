@@ -2,6 +2,8 @@
 import os
 import time
 import torch
+import re
+import difflib
 from utils import *
 from config import *
 from transformers import GPT2Config
@@ -71,7 +73,40 @@ model.load_state_dict(checkpoint['model'])
 model = model.to(device)
 model.eval()
 
+def postprocess_inst_names(abc_text):
+    with open('standard_inst_names.txt', 'r', encoding='utf-8') as f:
+        standard_instruments_list = [line.strip() for line in f if line.strip()]
 
+    with open('instrument_mapping.json', 'r', encoding='utf-8') as f:
+        instrument_mapping = json.load(f)
+
+    abc_lines = abc_text.split('\n')
+    abc_lines = list(filter(None, abc_lines))
+    abc_lines = [line + '\n' for line in abc_lines]
+
+    for i, line in enumerate(abc_lines):
+        if line.startswith('V:') and 'nm=' in line:
+            match = re.search(r'nm="([^"]*)"', line)
+            if match:
+                inst_name = match.group(1)
+
+                # Check if the instrument name is already standard
+                if inst_name in standard_instruments_list:
+                    continue
+
+                # Find the most similar key in instrument_mapping
+                matching_key = difflib.get_close_matches(inst_name, list(instrument_mapping.keys()), n=1, cutoff=0.6)
+
+                if matching_key:
+                    # Replace the instrument name with the standardized version
+                    replacement = instrument_mapping[matching_key[0]]
+                    new_line = line.replace(f'nm="{inst_name}"', f'nm="{replacement}"')
+                    abc_lines[i] = new_line
+
+    # Combine the lines back into a single string
+    processed_abc_text = ''.join(abc_lines)
+    return processed_abc_text
+    
 def complete_brackets(s):
     stack = []
     bracket_map = {'{': '}', '[': ']', '(': ')'}
@@ -316,4 +351,5 @@ def inference_patch(period, composer, instrumentation, initial_abc="", top_k=TOP
 
 if __name__ == '__main__':
     inference_patch('Classical', 'Beethoven, Ludwig van', 'Keyboard')
+
 

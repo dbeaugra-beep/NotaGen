@@ -185,7 +185,7 @@ def rest_unreduce(abc_lines):
     return unreduced_lines
 
 
-def inference_patch(period, composer, instrumentation):
+def inference_patch(period, composer, instrumentation, initial_abc="", top_k=TOP_K, top_p=TOP_P, temperature=TEMPERATURE):
 
     prompt_lines=[
     '%' + period + '\n',
@@ -223,9 +223,9 @@ def inference_patch(period, composer, instrumentation):
             while True:
                 with torch.autocast(device_type='cuda', dtype=torch.float16):
                     predicted_patch = model.generate(input_patches.unsqueeze(0),
-                                                    top_k=TOP_K,
-                                                    top_p=TOP_P,
-                                                    temperature=TEMPERATURE)
+                                                    top_k=top_k,
+                                                    top_p=top_p,
+                                                    temperature=temperature)
                 if not tunebody_flag and patchilizer.decode([predicted_patch]).startswith('[r:'):  # 初次进入tunebody，必须以[r:0/开头
                     tunebody_flag = True
                     r0_patch = torch.tensor([ord(c) for c in '[r:0/']).unsqueeze(0).to(device)
@@ -316,3 +316,4 @@ def inference_patch(period, composer, instrumentation):
 
 if __name__ == '__main__':
     inference_patch('Classical', 'Beethoven, Ludwig van', 'Keyboard')
+
